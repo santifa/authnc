@@ -1,0 +1,7 @@
+base   authnc
+author Henrik Jürges
+email  h.juerges@cobios.de
+date   2020-06-30
+name   authnc plugin
+desc   Use Nextcloud as DokuWiki authentication method
+url    https://github.com/santifa/authnc
