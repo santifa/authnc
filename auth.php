@@ -48,6 +48,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
 
 
 
+
     /**
      * Log off the current user [ OPTIONAL ]
      */
@@ -88,9 +89,10 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             // hurray, we're succeded
             $logged_in = true;
         } else {
-            msg("Failed to log in " . $xml ? " with error " . $xml->meta->message : " connection error");
+            $msg = $xml ? " with error " . $xml->meta->message : " connection error";
+            msg("Failed to log in " . $msg);
         }
-
+        
         if ($logged_in) {
             $groups = array();
             foreach ($xml->data->groups->element as $grp) {
@@ -387,13 +389,13 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
     protected function check_nc() {
         if ($this->con) return true; // correct link already set and nc reachable
         // create a new link
-        $server = $this->getConf('server') . ":" . $this->getConf('port') . $this->getConf('ocs-path');
+        $server = $this->getConf('server') . ":" . $this->getConf('port');
         //msg('NC instance: ' . $server);
         $con = curl_init($server);
         curl_setopt($con, CURLOPT_HEADER, 0);
 
         if (curl_exec($con)) {
-            $this->con = $server;
+            $this->con = $server . '/' . $this->getConf('ocs-path');
         } else {
             msg('Got error: ' . curl_error($con));
             return false;
@@ -407,6 +409,10 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
      *
      * Returns the parsed xml file or NULL if
      * the request or parsing failed.
+     *
+     * At some point curl generates an invalid syntax 998 error
+     * see https://www.freedesktop.org/wiki/Specifications/open-collaboration-services/
+     * and https://help.nextcloud.com/t/api-error-creating-user-failure-998-invalid-query/56530
      *
      * @param string $url  request url, shall return xml
      * @param string $user the user name
@@ -425,7 +431,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
         );
         curl_setopt_array($ch, $opts);
         if (! $result = curl_exec($ch)) {
-            msg('Request failed with error ' . curl_error($ch));
+            msg('Request failed with error ' . curl_error($ch) . '. Return code: ' . $result);
         } else {
             $ret = simplexml_load_string($result);
         }

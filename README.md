@@ -12,6 +12,13 @@ which uses a Nextcloud instance as authentication backend.
 * `getUsers` is somewhat broken, atm (too many requests)
 * The API may behave slowly
 * ATM, there are no tests, it was programmed against a live instance with a simple dw instance, see submodules (do not checkout)
+* The login form throws a `failure 998` invalid syntax, see [this](https://www.freedesktop.org/wiki/Specifications/open-collaboration-services/)
+
+##### ToDo
+
+* Only allow login for enabled users
+* allow only specific groups to login
+* allow bidirectional user changes 
 
 ##### Usage notes
 
