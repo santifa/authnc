@@ -49,6 +49,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
 
 
 
+
     /**
      * Log off the current user [ OPTIONAL ]
      */
@@ -92,7 +93,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             $msg = $xml ? " with error " . $xml->meta->message : " connection error";
             msg("Failed to log in " . $msg);
         }
-        
+
         if ($logged_in) {
             $groups = array();
             foreach ($xml->data->groups->element as $grp) {
