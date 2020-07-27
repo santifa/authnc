@@ -35,6 +35,13 @@ will not work!
 Please refer to http://www.dokuwiki.org/plugins for additional info
 on how to install plugins in DokuWiki.
 
+#### Collaboration
+
+* Pull request are highly welcome
+* Issues, feature requests, testing and hints are also welcome
+
+ Please use the bug tracker for any of them.
+
 ----
 Copyright (C) Henrik Jürges <h.juerges@cobios.de>
 
