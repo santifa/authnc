@@ -40,7 +40,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
         $this->cando['external']    = true; // does the module do external auth checking?
         $this->cando['logout']      = true; // can the user logout again? (eg. not possible with HTTP auth)
 
-        if (!function_exists('curl_init') || ! $this->check_nc()) {
+        if (!function_exists('curl_init') || ! $this->server_online()) {
             $this->success = false;
         }
         $this->success = true;
@@ -73,43 +73,47 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
         global $conf;
         $sticky ? $sticky = true : $sticky = false; //sanity check
 
+        // check only if a user tries to log in, otherwise the function is called with every pageload
+        if (!empty($user)) {
+            // try the login
+            $server = $this->con . 'users/' . $user;
+            $xml = $this->nc_request($server, $user, $pass);
+            $logged_in = false;
+            if ($xml && $xml->meta->status == "ok") {
+                // hurray, we're succeded
+                $logged_in = true;
+            } else {
+                $msg = $xml ? " with error " . $xml->meta->message : " connection error";
+                msg("Failed to log in " . $msg);
+            }
+
+            // we've got valid xml and the user is not disabled in the nc
+            if ($logged_in && $xml->data->enabled == '1') {
+                $groups = array();
+                foreach ($xml->data->groups->element as $grp) {
+                    $groups[] = (string)$grp;
+                }
+                //msg($groups);
+                // set the globals if authed
+                $USERINFO['name'] = (string)$xml->data->displayname;
+                $USERINFO['mail'] = (string)$xml->data->email;
+                $USERINFO['grps'] = $groups;
+                $_SERVER['REMOTE_USER'] = $user;
+                $_SESSION[DOKU_COOKIE]['auth']['user'] = $user;
+                $_SESSION[DOKU_COOKIE]['auth']['pass'] = $pass;
+                $_SESSION[DOKU_COOKIE]['auth']['info'] = $USERINFO;
+            }
+            return $logged_in;
+        }
+
         // check if already logged in
         if (!empty($_SESSION[DOKU_COOKIE]['auth']['info'])) {
-			$USERINFO['name'] = $_SESSION[DOKU_COOKIE]['auth']['info']['name'];
-			$USERINFO['mail'] = $_SESSION[DOKU_COOKIE]['auth']['info']['mail'];
-			$USERINFO['grps'] = $_SESSION[DOKU_COOKIE]['auth']['info']['grps'];
-			$_SERVER['REMOTE_USER'] = $_SESSION[DOKU_COOKIE]['auth']['user'];
-			return true;
-		}
-
-        // try the login
-        $server = $this->con . 'users/' . $user;
-        $xml = $this->nc_request($server, $user, $pass);
-        $logged_in = false;
-        if ($xml && $xml->meta->status == "ok") {
-            // hurray, we're succeded
-            $logged_in = true;
-        } else {
-            $msg = $xml ? " with error " . $xml->meta->message : " connection error";
-            msg("Failed to log in " . $msg);
+            $USERINFO['name'] = $_SESSION[DOKU_COOKIE]['auth']['info']['name'];
+            $USERINFO['mail'] = $_SESSION[DOKU_COOKIE]['auth']['info']['mail'];
+            $USERINFO['grps'] = $_SESSION[DOKU_COOKIE]['auth']['info']['grps'];
+            $_SERVER['REMOTE_USER'] = $_SESSION[DOKU_COOKIE]['auth']['user'];
+            return true;
         }
-
-        if ($logged_in) {
-            $groups = array();
-            foreach ($xml->data->groups->element as $grp) {
-                $groups[] = (string)$grp;
-            }
-            //msg($groups);
-            // set the globals if authed
-            $USERINFO['name'] = (string)$xml->data->displayname;
-            $USERINFO['mail'] = (string)$xml->data->email;
-            $USERINFO['grps'] = $groups;
-            $_SERVER['REMOTE_USER'] = $user;
-            $_SESSION[DOKU_COOKIE]['auth']['user'] = $user;
-            $_SESSION[DOKU_COOKIE]['auth']['pass'] = $pass;
-            $_SESSION[DOKU_COOKIE]['auth']['info'] = $USERINFO;
-        }
-        return $logged_in;
     }
 
     /**
@@ -236,11 +240,21 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
         $self['grps'] = $USERINFO['grps'];
         $users[] = $self;
         foreach($xml->data->users->element as $user) {
-            $usr['user'] = (string)$user;
-            $usr['name'] = (string)$user;
-            $usr['mail'] = "not implemented";
-            $usr['grps'] = array('not implemented');
-            $users[] = $usr;
+            // Request the user information for every user, this may take a while
+
+            $server = $this->con . 'users/' . (string)$user;
+            $xml = $this->nc_request($server, $_SESSION[DOKU_COOKIE]['auth']['user'], $_SESSION[DOKU_COOKIE]['auth']['pass']);
+            if ($xml && $xml->meta->status == "ok" && $xml->data->enabled == '1') {
+                $usr['user'] = (string)$user;
+                $usr['name'] = (string)$xml->data->displayname;
+                $usr['mail'] = (string)$xml->data->email;
+                $groups = array();
+                foreach ($xml->data->groups->element as $grp) {
+                    $groups[] = (string)$grp;
+                }
+                 $usr['grps'] = $groups;
+                 $users[] = $usr;  
+            }
         }
         return $users;
     }
@@ -304,6 +318,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             msg((string) $grp);
             $groups[(string)$grp] = (string)$grp;
         }
+        msg($groups);
         return $groups;
     }
 
@@ -387,22 +402,14 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
       // FIXME implement
     //}
 
-    protected function check_nc() {
-        if ($this->con) return true; // correct link already set and nc reachable
-        // create a new link
-        $server = $this->getConf('server') . ":" . $this->getConf('port');
-        //msg('NC instance: ' . $server);
-        $con = curl_init($server);
-        curl_setopt($con, CURLOPT_HEADER, 0);
-
-        if (curl_exec($con)) {
-            $this->con = $server . '/' . $this->getConf('ocs-path');
-        } else {
-            msg('Got error: ' . curl_error($con));
-            return false;
-        }
-        curl_close($con);
-        return true;
+    protected function server_online() {
+        if ($this->con) return true; // some link is already set
+        // check if the server is reachable by opening a socket
+        $host = explode(':', $this->getConf('server'));
+        $fp = fSockOpen('ssl:' . $host[1], $this->getConf('port'), $errno, $errstr, 5);
+        if (!$fp) return false; // server is not reachable
+        $this->con = $this->getConf('server') . ':' . $this->getConf('port') . '/' . $this->getConf('ocs-path');
+        return true; // no more error checking, assume reachable
     }
 
     /**
@@ -428,7 +435,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             CURLOPT_HTTPGET => 1, // default, but make clear
             CURLOPT_RETURNTRANSFER => TRUE,
             CURLOPT_USERPWD => $user . ':' . $pass,
-            CURLOPT_HTTPHEADER => array("OCS-APIRequest: true"),
+            CURLOPT_HTTPHEADER => array("OCS-APIRequest:true"),
         );
         curl_setopt_array($ch, $opts);
         if (! $result = curl_exec($ch)) {
