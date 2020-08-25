@@ -88,12 +88,13 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             }
 
             // we've got valid xml and the user is not disabled in the nc
-            if ($logged_in && $xml->data->enabled == '1') {
+            // if ($logged_in && $xml->data->enabled == '1') {
+            if ($logged_in) {
                 $groups = array();
                 foreach ($xml->data->groups->element as $grp) {
                     $groups[] = (string)$grp;
                 }
-                //msg($groups);
+                msg($groups);
                 // set the globals if authed
                 $USERINFO['name'] = (string)$xml->data->displayname;
                 $USERINFO['mail'] = (string)$xml->data->email;
