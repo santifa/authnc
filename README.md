@@ -43,7 +43,7 @@ on how to install plugins in DokuWiki.
  Please use the bug tracker for any of them.
 
 ----
-Copyright (C) Henrik Jürges <h.juerges@cobios.de>
+Copyright (C) Henrik Jürges <ratzeputz@rtzptz.xyz>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

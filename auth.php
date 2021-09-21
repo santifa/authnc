@@ -5,7 +5,7 @@
  * The commented functions are kept fore reference or later implementation.
  *
  * @license GPL 2 http://www.gnu.org/licenses/gpl-2.0.html
- * @author  Henrik Jürges <h.juerges@cobios.de>
+ * @author  Henrik Jürges <ratzeputz@rtzptz.xyz>
  */
 
 // must be run within Dokuwiki
@@ -18,6 +18,8 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
 
     protected $con = NULL;
 
+    protected $curl = NULL;
+    
     /**
      * Constructor.
      */
@@ -27,6 +29,14 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
         global $config_cascade;
         global $config;
 
+        $this->curl = curl_init();
+        $options = array(
+            CURLOPT_HTTPGET => 1, // default, but make clear
+            CURLOPT_RETURNTRANSFER => TRUE,
+            CURLOPT_HTTPHEADER => array("OCS-APIRequest:true"),
+        );
+        curl_setopt_array($this->curl, $options);
+       
         $this->cando['addUser']     = false; // can Users be created?
         $this->cando['delUser']     = false; // can Users be deleted?
         $this->cando['modLogin']    = false; // can login names be changed?
@@ -47,15 +57,13 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
     }
 
 
-
-
-
     /**
      * Log off the current user [ OPTIONAL ]
      */
     public function logOff()
     {
         // return nothing to log out
+        curl_close($this->curl);
     }
 
     /**
@@ -81,14 +89,13 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             $logged_in = false;
             if ($xml && $xml->meta->status == "ok") {
                 // hurray, we're succeded
+
                 $logged_in = true;
             } else {
                 $msg = $xml ? " with error " . $xml->meta->message : " connection error";
                 msg("Failed to log in " . $msg);
             }
 
-            // we've got valid xml and the user is not disabled in the nc
-            // if ($logged_in && $xml->data->enabled == '1') {
             if ($logged_in) {
                 $groups = array();
                 foreach ($xml->data->groups->element as $grp) {
@@ -103,17 +110,17 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
                 $_SESSION[DOKU_COOKIE]['auth']['pass'] = $pass;
                 $_SESSION[DOKU_COOKIE]['auth']['info'] = $USERINFO;
             }
-            return $logged_in;
         }
-
+        
         // check if already logged in
         if (!empty($_SESSION[DOKU_COOKIE]['auth']['info'])) {
             $USERINFO['name'] = $_SESSION[DOKU_COOKIE]['auth']['info']['name'];
             $USERINFO['mail'] = $_SESSION[DOKU_COOKIE]['auth']['info']['mail'];
             $USERINFO['grps'] = $_SESSION[DOKU_COOKIE]['auth']['info']['grps'];
             $_SERVER['REMOTE_USER'] = $_SESSION[DOKU_COOKIE]['auth']['user'];
-            return true;
+            $logged_in = true;
         }
+        return $logged_in;
     }
 
     /**
@@ -152,7 +159,9 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
         $self['user'] = $_SESSION[DOKU_COOKIE]['auth']['user'];
         $self['name'] = $USERINFO['name'];
         $self['mail'] = $USERINFO['mail'];
-        $self['grps'] = $USERINFO['grps'];
+        if ($requireGroups) {
+            $self['grps'] = $USERINFO['grps'];
+        }
         return $self;
     }
 
@@ -177,7 +186,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
      */
     //public function createUser($user, $pass, $name, $mail, $grps = null)
     //{
-        // FIXME implement
+    // FIXME implement
     //    return null;
     //}
 
@@ -193,7 +202,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
      */
     //public function modifyUser($user, $changes)
     //{
-        // FIXME implement
+    // FIXME implement
     //    return false;
     //}
 
@@ -208,7 +217,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
      */
     //public function deleteUsers($users)
     //{
-        // FIXME implement
+    // FIXME implement
     //    return false;
     //}
 
@@ -241,7 +250,10 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
         $users[] = $self;
         foreach($xml->data->users->element as $user) {
             // Request the user information for every user, this may take a while
-
+            if ($user == $_SESSION[DOKU_COOKIE]['auth']['user']) {
+                continue; // Skip the session user
+            }
+            
             $server = $this->con . 'users/' . (string)$user;
             $xml = $this->nc_request($server, $_SESSION[DOKU_COOKIE]['auth']['user'], $_SESSION[DOKU_COOKIE]['auth']['pass']);
             if ($xml && $xml->meta->status == "ok" && $xml->data->enabled == '1') {
@@ -318,7 +330,6 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             msg((string) $grp);
             $groups[(string)$grp] = (string)$grp;
         }
-        msg($groups);
         return $groups;
     }
 
@@ -429,21 +440,13 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
      * @return object the parsed xml or NULL
      */
     protected function nc_request($url, $user, $pass) {
-        $ret = NULL;
-        $ch = curl_init($url);
-        $opts = array(
-            CURLOPT_HTTPGET => 1, // default, but make clear
-            CURLOPT_RETURNTRANSFER => TRUE,
-            CURLOPT_USERPWD => $user . ':' . $pass,
-            CURLOPT_HTTPHEADER => array("OCS-APIRequest:true"),
-        );
-        curl_setopt_array($ch, $opts);
-        if (! $result = curl_exec($ch)) {
-            msg('Request failed with error ' . curl_error($ch) . '. Return code: ' . $result);
+        curl_setopt($this->curl, CURLOPT_USERPWD, $user . ':' . $pass);
+        curl_setopt($this->curl, CURLOPT_URL, $url);
+        if ($result = curl_exec($this->curl)) {
+            return simplexml_load_string($result);
         } else {
-            $ret = simplexml_load_string($result);
+            msg('Request failed with error: ' . curl_error($ch) . '. Return code: ' . $result);
+            return NULL;
         }
-        curl_close($ch);
-        return $ret;
     }
 }
