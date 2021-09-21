@@ -2,7 +2,7 @@
 /**
  * english language file for authnc plugin
  *
- * @author Henrik Jürges <h.juerges@cobios.de>
+ * @author Henrik Jürges <ratzeputz@rtzptz.xyz>
  */
 
 $lang['server']   = 'Nextlcoud server hostname (e.g. https://cloud.example.com)';
