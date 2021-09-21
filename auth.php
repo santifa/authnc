@@ -94,7 +94,6 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
                 foreach ($xml->data->groups->element as $grp) {
                     $groups[] = (string)$grp;
                 }
-                msg($groups);
                 // set the globals if authed
                 $USERINFO['name'] = (string)$xml->data->displayname;
                 $USERINFO['mail'] = (string)$xml->data->email;
