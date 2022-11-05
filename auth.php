@@ -15,19 +15,18 @@ if (!defined('DOKU_INC')) {
 
 class auth_plugin_authnc extends DokuWiki_Auth_Plugin
 {
-
+    /** @var the connection url */
     protected $con = NULL;
 
+    /** @var curl configuration */
     protected $curl = NULL;
-    
+
     /**
      * Constructor.
      */
     public function __construct()
     {
         parent::__construct(); // for compatibility
-        global $config_cascade;
-        global $config;
 
         $this->curl = curl_init();
         $options = array(
@@ -36,7 +35,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             CURLOPT_HTTPHEADER => array("OCS-APIRequest:true"),
         );
         curl_setopt_array($this->curl, $options);
-       
+
         $this->cando['addUser']     = false; // can Users be created?
         $this->cando['delUser']     = false; // can Users be deleted?
         $this->cando['modLogin']    = false; // can login names be changed?
@@ -78,18 +77,17 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
     public function trustExternal($user, $pass, $sticky = false)
     {
         global $USERINFO;
-        global $conf;
         $sticky ? $sticky = true : $sticky = false; //sanity check
 
         // check only if a user tries to log in, otherwise the function is called with every pageload
         if (!empty($user)) {
+
             // try the login
             $server = $this->con . 'users/' . $user;
             $xml = $this->nc_request($server, $user, $pass);
             $logged_in = false;
             if ($xml && $xml->meta->status == "ok") {
                 // hurray, we're succeded
-
                 $logged_in = true;
             } else {
                 $msg = $xml ? " with error " . $xml->meta->message : " connection error";
@@ -111,7 +109,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
                 $_SESSION[DOKU_COOKIE]['auth']['info'] = $USERINFO;
             }
         }
-        
+
         // check if already logged in
         if (!empty($_SESSION[DOKU_COOKIE]['auth']['info'])) {
             $USERINFO['name'] = $_SESSION[DOKU_COOKIE]['auth']['info']['name'];
@@ -253,7 +251,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             if ($user == $_SESSION[DOKU_COOKIE]['auth']['user']) {
                 continue; // Skip the session user
             }
-            
+
             $server = $this->con . 'users/' . (string)$user;
             $xml = $this->nc_request($server, $_SESSION[DOKU_COOKIE]['auth']['user'], $_SESSION[DOKU_COOKIE]['auth']['pass']);
             if ($xml && $xml->meta->status == "ok" && $xml->data->enabled == '1') {
@@ -264,8 +262,8 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
                 foreach ($xml->data->groups->element as $grp) {
                     $groups[] = (string)$grp;
                 }
-                 $usr['grps'] = $groups;
-                 $users[] = $usr;  
+                $usr['grps'] = $groups;
+                $users[] = $usr;
             }
         }
         return $users;
