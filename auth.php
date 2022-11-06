@@ -32,6 +32,10 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
         $options = array(
             CURLOPT_HTTPGET => 1, // default, but make clear
             CURLOPT_RETURNTRANSFER => TRUE,
+            CURLOPT_ENCODING => '',
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4,
+            CURLOPT_TCP_FASTOPEN => 1,
             CURLOPT_HTTPHEADER => array("OCS-APIRequest:true"),
         );
         curl_setopt_array($this->curl, $options);
@@ -52,6 +56,8 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
         if (!function_exists('curl_init') || ! $this->server_online()) {
             $this->success = false;
         }
+        // Optimize requests by pre-resolving the address.
+        curl_setopt($this-curl, CURLOPT_RESOLVE, $this->con);
         $this->success = true;
     }
 
@@ -86,6 +92,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             $server = $this->con . 'users/' . $user;
             $xml = $this->nc_request($server, $user, $pass);
             $logged_in = false;
+
             if ($xml && $xml->meta->status == "ok") {
                 // hurray, we're succeded
                 $logged_in = true;
@@ -440,10 +447,11 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
     protected function nc_request($url, $user, $pass) {
         curl_setopt($this->curl, CURLOPT_USERPWD, $user . ':' . $pass);
         curl_setopt($this->curl, CURLOPT_URL, $url);
+
         if ($result = curl_exec($this->curl)) {
             return simplexml_load_string($result);
         } else {
-            msg('Request failed with error: ' . curl_error($ch) . '. Return code: ' . $result);
+            msg('Request failed with error: ' . curl_error($this->curl) . '. Return code: ' . $result);
             return NULL;
         }
     }
