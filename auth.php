@@ -34,9 +34,10 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             CURLOPT_RETURNTRANSFER => TRUE,
             CURLOPT_ENCODING => '',
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4,
+            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
             CURLOPT_TCP_FASTOPEN => 1,
             CURLOPT_HTTPHEADER => array("OCS-APIRequest:true"),
+            CURLOPT_RESOLVE => array($this->con), // Optimize requests by pre-resolving the address.
         );
         curl_setopt_array($this->curl, $options);
 
@@ -56,8 +57,6 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
         if (!function_exists('curl_init') || ! $this->server_online()) {
             $this->success = false;
         }
-        // Optimize requests by pre-resolving the address.
-        curl_setopt($this-curl, CURLOPT_RESOLVE, $this->con);
         $this->success = true;
     }
 
