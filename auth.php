@@ -37,7 +37,7 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
             CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
             CURLOPT_TCP_FASTOPEN => 1,
             CURLOPT_HTTPHEADER => array("OCS-APIRequest:true"),
-            CURLOPT_RESOLVE => array($this->con), // Optimize requests by pre-resolving the address.
+            //CURLOPT_RESOLVE => array($this->con), // Optimize requests by pre-resolving the address.
         );
         curl_setopt_array($this->curl, $options);
 
@@ -84,13 +84,13 @@ class auth_plugin_authnc extends DokuWiki_Auth_Plugin
         global $USERINFO;
         $sticky ? $sticky = true : $sticky = false; //sanity check
 
+        $logged_in = false;
         // check only if a user tries to log in, otherwise the function is called with every pageload
         if (!empty($user)) {
 
             // try the login
             $server = $this->con . 'users/' . $user;
             $xml = $this->nc_request($server, $user, $pass);
-            $logged_in = false;
 
             if ($xml && $xml->meta->status == "ok") {
                 // hurray, we're succeded
